@@ -2,14 +2,17 @@ package com.example.rbpolab2.service;
 
 import com.example.rbpolab2.dto.ExpertReviewDto;
 import com.example.rbpolab2.model.ExpertReview;
+import com.example.rbpolab2.model.ProjectApplication;
+import com.example.rbpolab2.model.User;
 import com.example.rbpolab2.repository.ExpertReviewRepository;
 import com.example.rbpolab2.repository.ProjectApplicationRepository;
 import com.example.rbpolab2.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Service
 public class ExpertReviewService {
@@ -26,43 +29,73 @@ public class ExpertReviewService {
         this.userRepository = userRepository;
     }
 
-    public List<ExpertReview> getAll() {
+    public List<ExpertReview> findAll() {
         return reviewRepository.findAll();
     }
 
-    public ExpertReview getById(Long id) {
-        return reviewRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Экспертная оценка с id " + id + " не найдена"));
+    public Optional<ExpertReview> findById(Long id) {
+        return reviewRepository.findById(id);
     }
 
+    @Transactional
     public ExpertReview create(ExpertReviewDto dto) {
-        if (dto.getApplicationId() == null || !applicationRepository.existsById(dto.getApplicationId())) {
-            throw new IllegalArgumentException("Заявка с id " + dto.getApplicationId() + " не найдена");
-        }
-        if (dto.getExpertId() == null || !userRepository.existsById(dto.getExpertId())) {
-            throw new IllegalArgumentException("Эксперт с id " + dto.getExpertId() + " не найден");
-        }
-        ExpertReview review = new ExpertReview(
-                null,
-                dto.getApplicationId(),
-                dto.getExpertId(),
-                dto.getScore(),
-                dto.getComment(),
-                LocalDateTime.now()
-        );
+        ExpertReview review = new ExpertReview();
+        review.setApplicationId(dto.getApplicationId());
+        review.setExpertId(dto.getExpertId());
+        review.setScore(dto.getScore());
+        review.setComment(dto.getComment());
+        review.setCreatedAt(LocalDateTime.now());
         return reviewRepository.save(review);
     }
 
-    public ExpertReview update(Long id, ExpertReviewDto dto) {
-        ExpertReview review = getById(id);
-        if (dto.getScore() != null) review.setScore(dto.getScore());
-        if (dto.getComment() != null) review.setComment(dto.getComment());
-        return reviewRepository.save(review);
+    @Transactional
+    public Optional<ExpertReview> update(Long id, ExpertReviewDto dto) {
+        return reviewRepository.findById(id).map(r -> {
+            if (dto.getScore() != null) r.setScore(dto.getScore());
+            if (dto.getComment() != null) r.setComment(dto.getComment());
+            return reviewRepository.save(r);
+        });
     }
 
-    public void delete(Long id) {
-        if (!reviewRepository.deleteById(id)) {
-            throw new NoSuchElementException("Экспертная оценка с id " + id + " не найдена");
+    @Transactional
+    public boolean deleteById(Long id) {
+        if (!reviewRepository.existsById(id)) return false;
+        reviewRepository.deleteById(id);
+        return true;
+    }
+
+    @Transactional
+    public ExpertReview evaluateApplication(ExpertReviewDto dto) {
+        if (dto.getScore() == null || dto.getScore() < 0 || dto.getScore() > 100) {
+            throw new IllegalArgumentException("Оценка должна быть в диапазоне от 0 до 100");
         }
+
+        User expert = userRepository.findById(dto.getExpertId())
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
+        if (!"EXPERT".equalsIgnoreCase(expert.getRole())) {
+            throw new IllegalStateException("Пользователь не является экспертом");
+        }
+
+        ProjectApplication app = applicationRepository.findById(dto.getApplicationId())
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена"));
+
+        if (!"SUBMITTED".equalsIgnoreCase(app.getStatus()) && !"UNDER_REVIEW".equalsIgnoreCase(app.getStatus())) {
+            throw new IllegalStateException("Заявка не подлежит оценке в текущем статусе");
+        }
+
+        if (reviewRepository.existsByApplicationIdAndExpertId(dto.getApplicationId(), dto.getExpertId())) {
+            throw new IllegalStateException("Эксперт уже выставил оценку этой заявке");
+        }
+
+        app.setStatus("UNDER_REVIEW");
+        applicationRepository.save(app);
+
+        ExpertReview review = new ExpertReview();
+        review.setApplicationId(dto.getApplicationId());
+        review.setExpertId(dto.getExpertId());
+        review.setScore(dto.getScore());
+        review.setComment(dto.getComment());
+        review.setCreatedAt(LocalDateTime.now());
+        return reviewRepository.save(review);
     }
 }

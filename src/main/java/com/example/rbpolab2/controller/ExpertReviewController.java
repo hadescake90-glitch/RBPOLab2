@@ -21,12 +21,14 @@ public class ExpertReviewController {
 
     @GetMapping
     public ResponseEntity<List<ExpertReview>> getAll() {
-        return ResponseEntity.ok(service.getAll());
+        return ResponseEntity.ok(service.findAll());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ExpertReview> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(service.getById(id));
+        return service.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
@@ -36,12 +38,22 @@ public class ExpertReviewController {
 
     @PatchMapping("/{id}")
     public ResponseEntity<ExpertReview> update(@PathVariable Long id, @RequestBody ExpertReviewDto dto) {
-        return ResponseEntity.ok(service.update(id, dto));
+        return service.update(id, dto)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        service.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (service.deleteById(id)) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // Бизнес-операция 2: Проведение оценки экспертом
+    @PostMapping("/evaluate")
+    public ResponseEntity<ExpertReview> evaluate(@RequestBody ExpertReviewDto dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.evaluateApplication(dto));
     }
 }

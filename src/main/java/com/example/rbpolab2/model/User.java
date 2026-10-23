@@ -1,12 +1,26 @@
 package com.example.rbpolab2.model;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "users")
 public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "full_name", nullable = false)
     private String fullName;
+
+    @Column(name = "email", nullable = false, unique = true)
     private String email;
-    private String role; // Например: "APPLICANT", "EXPERT", "ADMIN"
+
+    @Column(name = "role", nullable = false)
+    private String role; // "APPLICANT", "EXPERT", "ADMIN"
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     public User() {}

@@ -1,0 +1,60 @@
+### 1. Создание соискателя (автора проекта)
+POST http://localhost:8080/api/users
+Content-Type: application/json
+
+{
+  "fullName": "Иван Смирнов",
+  "email": "ivan.smirnov@example.com",
+  "role": "APPLICANT"
+}
+
+### 2. Создание эксперта
+POST http://localhost:8080/api/users
+Content-Type: application/json
+
+{
+  "fullName": "Профессор Петров",
+  "email": "petrov@expert.org",
+  "role": "EXPERT"
+}
+
+### 3. Создание конкурса грантов
+POST http://localhost:8080/api/grant-competitions
+Content-Type: application/json
+
+{
+  "title": "Научные IT-инициативы 2026",
+  "budget": 1000000.00,
+  "status": "OPEN"
+}
+
+### 4. Бизнес-операция 1: Подача заявки с проверкой условий
+POST http://localhost:8080/api/project-applications/submit
+Content-Type: application/json
+
+{
+  "competitionId": 1,
+  "authorId": 1,
+  "projectName": "Автоматизированная система мониторинга",
+  "requestedAmount": 450000.00
+}
+
+### 5. Бизнес-операция 2: Экспертная оценка заявки
+POST http://localhost:8080/api/expert-reviews/evaluate
+Content-Type: application/json
+
+{
+  "applicationId": 1,
+  "expertId": 2,
+  "score": 92,
+  "comment": "Отличный стек и архитектура"
+}
+
+### 6. Бизнес-операция 3: Завершение конкурса и авто-распределение средств
+POST http://localhost:8080/api/grant-competitions/1/finalize
+
+### 7. Бизнес-операция 4: Выплата гранта победителю
+POST http://localhost:8080/api/project-applications/1/disburse
+
+### 8. Бизнес-операция 5: Отзыв заявки
+POST http://localhost:8080/api/project-applications/1/withdraw
