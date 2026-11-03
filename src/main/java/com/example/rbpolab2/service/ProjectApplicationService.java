@@ -1,6 +1,8 @@
 package com.example.rbpolab2.service;
 
 import com.example.rbpolab2.dto.ProjectApplicationDto;
+import com.example.rbpolab2.model.FundingDecision;
+import com.example.rbpolab2.model.GrantCompetition;
 import com.example.rbpolab2.model.ProjectApplication;
 import com.example.rbpolab2.repository.ExpertReviewRepository;
 import com.example.rbpolab2.repository.FundingDecisionRepository;
@@ -8,10 +10,11 @@ import com.example.rbpolab2.repository.GrantCompetitionRepository;
 import com.example.rbpolab2.repository.ProjectApplicationRepository;
 import com.example.rbpolab2.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Service
 public class ProjectApplicationService {
@@ -34,60 +37,109 @@ public class ProjectApplicationService {
         this.decisionRepository = decisionRepository;
     }
 
-    public List<ProjectApplication> getAll() {
+    public List<ProjectApplication> findAll() {
         return applicationRepository.findAll();
     }
 
-    public ProjectApplication getById(Long id) {
-        return applicationRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Заявка с id " + id + " не найдена"));
+    public Optional<ProjectApplication> findById(Long id) {
+        return applicationRepository.findById(id);
     }
 
+    @Transactional
     public ProjectApplication create(ProjectApplicationDto dto) {
-        if (dto.getCompetitionId() == null || !competitionRepository.existsById(dto.getCompetitionId())) {
-            throw new IllegalArgumentException("Конкурс с id " + dto.getCompetitionId() + " не найден");
-        }
-        if (dto.getAuthorId() == null || !userRepository.existsById(dto.getAuthorId())) {
-            throw new IllegalArgumentException("Автор с id " + dto.getAuthorId() + " не найден");
-        }
-        ProjectApplication app = new ProjectApplication(
-                null,
-                dto.getCompetitionId(),
-                dto.getAuthorId(),
-                dto.getProjectName(),
-                dto.getRequestedAmount(),
-                dto.getStatus() != null ? dto.getStatus() : "SUBMITTED",
-                LocalDateTime.now()
-        );
+        ProjectApplication app = new ProjectApplication();
+        app.setCompetitionId(dto.getCompetitionId());
+        app.setAuthorId(dto.getAuthorId());
+        app.setProjectName(dto.getProjectName());
+        app.setRequestedAmount(dto.getRequestedAmount());
+        app.setStatus(dto.getStatus() != null ? dto.getStatus() : "SUBMITTED");
+        app.setCreatedAt(LocalDateTime.now());
         return applicationRepository.save(app);
     }
 
-    public ProjectApplication update(Long id, ProjectApplicationDto dto) {
-        ProjectApplication app = getById(id);
-        if (dto.getCompetitionId() != null) {
-            if (!competitionRepository.existsById(dto.getCompetitionId())) {
-                throw new IllegalArgumentException("Конкурс с id " + dto.getCompetitionId() + " не найден");
-            }
-            app.setCompetitionId(dto.getCompetitionId());
-        }
-        if (dto.getAuthorId() != null) {
-            if (!userRepository.existsById(dto.getAuthorId())) {
-                throw new IllegalArgumentException("Автор с id " + dto.getAuthorId() + " не найден");
-            }
-            app.setAuthorId(dto.getAuthorId());
-        }
-        if (dto.getProjectName() != null) app.setProjectName(dto.getProjectName());
-        if (dto.getRequestedAmount() != null) app.setRequestedAmount(dto.getRequestedAmount());
-        if (dto.getStatus() != null) app.setStatus(dto.getStatus());
-        return applicationRepository.save(app);
+    @Transactional
+    public Optional<ProjectApplication> update(Long id, ProjectApplicationDto dto) {
+        return applicationRepository.findById(id).map(app -> {
+            if (dto.getProjectName() != null) app.setProjectName(dto.getProjectName());
+            if (dto.getRequestedAmount() != null) app.setRequestedAmount(dto.getRequestedAmount());
+            if (dto.getStatus() != null) app.setStatus(dto.getStatus());
+            return applicationRepository.save(app);
+        });
     }
 
-    public void delete(Long id) {
+    @Transactional
+    public boolean deleteById(Long id) {
         if (!applicationRepository.existsById(id)) {
-            throw new NoSuchElementException("Заявка с id " + id + " не найдена");
+            return false;
         }
-        reviewRepository.findAll().removeIf(r -> id.equals(r.getApplicationId()));
-        decisionRepository.findAll().removeIf(d -> id.equals(d.getApplicationId()));
+        reviewRepository.findByApplicationId(id).forEach(reviewRepository::delete);
+        decisionRepository.findByApplicationId(id).ifPresent(decisionRepository::delete);
         applicationRepository.deleteById(id);
+        return true;
+    }
+
+    // БИЗНЕС-ОПЕРАЦИЯ 1: Подача заявки с проверкой условий
+    @Transactional
+    public ProjectApplication submitApplication(ProjectApplicationDto dto) {
+        GrantCompetition comp = competitionRepository.findById(dto.getCompetitionId())
+                .orElseThrow(() -> new IllegalArgumentException("Конкурс не найден"));
+
+        if (!"OPEN".equalsIgnoreCase(comp.getStatus())) {
+            throw new IllegalStateException("Конкурс закрыт для приема заявок");
+        }
+        if (!userRepository.existsById(dto.getAuthorId())) {
+            throw new IllegalArgumentException("Автор не зарегистрирован");
+        }
+        if (dto.getRequestedAmount() != null && comp.getBudget() != null && dto.getRequestedAmount().compareTo(comp.getBudget()) > 0) {
+            throw new IllegalArgumentException("Запрашиваемая сумма превышает общий бюджет конкурса");
+        }
+
+        ProjectApplication app = new ProjectApplication();
+        app.setCompetitionId(comp.getId());
+        app.setAuthorId(dto.getAuthorId());
+        app.setProjectName(dto.getProjectName());
+        app.setRequestedAmount(dto.getRequestedAmount());
+        app.setStatus("SUBMITTED");
+        app.setCreatedAt(LocalDateTime.now());
+        return applicationRepository.save(app);
+    }
+
+    // БИЗНЕС-ОПЕРАЦИЯ 4: Выплата гранта
+    @Transactional
+    public ProjectApplication disburseGrant(Long applicationId) {
+        ProjectApplication app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена"));
+
+        if (!"APPROVED".equalsIgnoreCase(app.getStatus())) {
+            throw new IllegalStateException("Финансирование возможно только для одобренных заявок");
+        }
+
+        FundingDecision decision = decisionRepository.findByApplicationId(applicationId)
+                .orElseThrow(() -> new IllegalStateException("Решение о финансировании отсутствует"));
+
+        decision.setStatus("PAID");
+        decisionRepository.save(decision);
+
+        app.setStatus("FUNDED");
+        return applicationRepository.save(app);
+    }
+
+    // БИЗНЕС-ОПЕРАЦИЯ 5: Отзыв заявки
+    @Transactional
+    public ProjectApplication withdrawApplication(Long applicationId) {
+        ProjectApplication app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена"));
+
+        if ("FUNDED".equalsIgnoreCase(app.getStatus())) {
+            throw new IllegalStateException("Нельзя отозвать профинансированный проект");
+        }
+
+        decisionRepository.findByApplicationId(applicationId).ifPresent(decision -> {
+            decision.setStatus("CANCELLED");
+            decisionRepository.save(decision);
+        });
+
+        app.setStatus("REJECTED");
+        return applicationRepository.save(app);
     }
 }

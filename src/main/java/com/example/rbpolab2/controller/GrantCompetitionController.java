@@ -5,6 +5,7 @@ import com.example.rbpolab2.model.GrantCompetition;
 import com.example.rbpolab2.service.GrantCompetitionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,35 +14,51 @@ import java.util.List;
 @RequestMapping("/api/grant-competitions")
 public class GrantCompetitionController {
 
-    private final GrantCompetitionService service;
+    private final GrantCompetitionService competitionService;
 
-    public GrantCompetitionController(GrantCompetitionService service) {
-        this.service = service;
+    public GrantCompetitionController(GrantCompetitionService competitionService) {
+        this.competitionService = competitionService;
     }
 
     @GetMapping
-    public ResponseEntity<List<GrantCompetition>> getAll() {
-        return ResponseEntity.ok(service.getAll());
+    public List<GrantCompetition> getAll() {
+        return competitionService.findAll();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<GrantCompetition> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(service.getById(id));
+        return competitionService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GrantCompetition> create(@RequestBody GrantCompetitionDto dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(competitionService.create(dto));
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GrantCompetition> update(@PathVariable Long id, @RequestBody GrantCompetitionDto dto) {
-        return ResponseEntity.ok(service.update(id, dto));
+        return competitionService.update(id, dto)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        service.delete(id);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (competitionService.deleteById(id)) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // Бизнес-операция 3: Завершение конкурса (только администратор)
+    @PostMapping("/{id}/finalize")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GrantCompetition> finalizeCompetition(@PathVariable Long id) {
+        return ResponseEntity.ok(competitionService.finalizeCompetition(id));
     }
 }

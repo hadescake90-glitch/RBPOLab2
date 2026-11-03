@@ -13,35 +13,41 @@ import java.util.List;
 @RequestMapping("/api/funding-decisions")
 public class FundingDecisionController {
 
-    private final FundingDecisionService service;
+    private final FundingDecisionService decisionService;
 
-    public FundingDecisionController(FundingDecisionService service) {
-        this.service = service;
+    public FundingDecisionController(FundingDecisionService decisionService) {
+        this.decisionService = decisionService;
     }
 
     @GetMapping
-    public ResponseEntity<List<FundingDecision>> getAll() {
-        return ResponseEntity.ok(service.getAll());
+    public List<FundingDecision> getAll() {
+        return decisionService.findAll();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<FundingDecision> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(service.getById(id));
+        return decisionService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
     public ResponseEntity<FundingDecision> create(@RequestBody FundingDecisionDto dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(decisionService.create(dto));
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<FundingDecision> update(@PathVariable Long id, @RequestBody FundingDecisionDto dto) {
-        return ResponseEntity.ok(service.update(id, dto));
+        return decisionService.update(id, dto)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        service.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (decisionService.deleteById(id)) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
     }
 }

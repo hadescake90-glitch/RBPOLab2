@@ -1,15 +1,33 @@
 package com.example.rbpolab2.model;
 
+import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "project_applications")
 public class ProjectApplication {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "competition_id", nullable = false)
     private Long competitionId;
+
+    @Column(name = "author_id", nullable = false)
     private Long authorId;
+
+    @Column(name = "project_name", nullable = false)
     private String projectName;
+
+    @Column(name = "requested_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal requestedAmount;
-    private String status; // "SUBMITTED", "APPROVED", "REJECTED"
+
+    @Column(name = "status", nullable = false)
+    private String status; // "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "FUNDED"
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     public ProjectApplication() {}

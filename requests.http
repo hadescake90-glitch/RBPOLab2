@@ -1,0 +1,103 @@
+GET http://localhost:8080/api/csrf
+
+> {%
+    // Автоматическое сохранение токена в переменную окружения клиента
+    client.global.set("csrf_token", response.body.token);
+%}
+
+
+### 2. РЕГИСТРАЦИЯ ПОЛЬЗОВАТЕЛЕЙ
+
+
+### 2.1 Ошибка валидации: слабый пароль (без спецсимвола/цифры) -> 400 Bad Request
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf_token}}
+
+{
+  "fullName": "Слабый Пароль",
+  "email": "weak@example.com",
+  "password": "simple"
+}
+
+### 2.2 Успешная регистрация соискателя (автоматически выдается ROLE_APPLICANT)
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf_token}}
+
+{
+  "fullName": "Алексей Смирнов",
+  "email": "smirnov@applicant.local",
+  "password": "Password123!"
+}
+
+
+### 3. ДЕМОНСТРАЦИЯ ОШИБОК БЕЗОПАСНОСТИ (401 и 403)
+
+
+### 3.1 Ошибка 401 Unauthorized: попытка доступа к закрытому API без логина
+GET http://localhost:8080/api/grant-competitions
+
+### 3.2 Ошибка 403 Forbidden: Соискатель пытается создать конкурс (доступно только ADMIN)
+POST http://localhost:8080/api/grant-competitions
+Authorization: Basic smirnov@applicant.local Password123!
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf_token}}
+
+{
+  "title": "Хакерский конкурс",
+  "budget": 500000.00,
+  "status": "OPEN"
+}
+
+
+### 4. ОСНОВНОЙ БИЗНЕС-СЦЕНАРИЙ С РАЗГРАНИЧЕНИЕМ ПРАВ
+
+
+### 4.1 ADMIN: Создание конкурса грантов
+POST http://localhost:8080/api/grant-competitions
+Authorization: Basic admin@system.local AdminPass123!
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf_token}}
+
+{
+  "title": "Инновации в РБПО 2026",
+  "budget": 1000000.00,
+  "status": "OPEN"
+}
+
+### 4.2 APPLICANT: Бизнес-операция 1 — Подача заявки на конкурс
+POST http://localhost:8080/api/project-applications/submit
+Authorization: Basic smirnov@applicant.local Password123!
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf_token}}
+
+{
+  "competitionId": 1,
+  "authorId": 3,
+  "projectName": "Безопасный REST API шлюз",
+  "requestedAmount": 350000.00
+}
+
+### 4.3 EXPERT: Бизнес-операция 2 — Экспертная оценка заявки
+POST http://localhost:8080/api/expert-reviews/evaluate
+Authorization: Basic expert@system.local ExpertPass123!
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf_token}}
+
+{
+  "applicationId": 1,
+  "expertId": 2,
+  "score": 95,
+  "comment": "Отличная проработка механизмов аутентификации"
+}
+
+### 4.4 ADMIN: Бизнес-операция 3 — Финализация конкурса
+POST http://localhost:8080/api/grant-competitions/1/finalize
+Authorization: Basic admin@system.local AdminPass123!
+X-XSRF-TOKEN: {{csrf_token}}
+
+### 4.5 ADMIN: Бизнес-операция 4 — Выплата гранта победителю
+POST http://localhost:8080/api/project-applications/1/disburse
+Authorization: Basic admin@system.local AdminPass123!
+X-XSRF-TOKEN: {{csrf_token}}

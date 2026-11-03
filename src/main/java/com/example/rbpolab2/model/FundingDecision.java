@@ -1,13 +1,30 @@
 package com.example.rbpolab2.model;
 
+import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(
+        name = "funding_decisions",
+        uniqueConstraints = @UniqueConstraint(name = "uk_decision_application", columnNames = {"application_id"})
+)
 public class FundingDecision {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "application_id", nullable = false)
     private Long applicationId;
+
+    @Column(name = "approved_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal approvedAmount;
-    private String status; // "APPROVED", "REJECTED", "PAID"
+
+    @Column(name = "status", nullable = false)
+    private String status; // "APPROVED", "REJECTED", "PAID", "CANCELLED"
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     public FundingDecision() {}
