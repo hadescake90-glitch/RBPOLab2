@@ -5,6 +5,7 @@ import com.example.rbpolab2.model.ExpertReview;
 import com.example.rbpolab2.service.ExpertReviewService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,11 +33,13 @@ public class ExpertReviewController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ExpertReview> create(@RequestBody ExpertReviewDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ExpertReview> update(@PathVariable Long id, @RequestBody ExpertReviewDto dto) {
         return service.update(id, dto)
                 .map(ResponseEntity::ok)
@@ -44,6 +47,7 @@ public class ExpertReviewController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (service.deleteById(id)) {
             return ResponseEntity.noContent().build();
@@ -51,8 +55,9 @@ public class ExpertReviewController {
         return ResponseEntity.notFound().build();
     }
 
-    // Бизнес-операция 2: Проведение оценки экспертом
+    // Бизнес-операция 2: Экспертная оценка (только эксперт)
     @PostMapping("/evaluate")
+    @PreAuthorize("hasRole('EXPERT')")
     public ResponseEntity<ExpertReview> evaluate(@RequestBody ExpertReviewDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.evaluateApplication(dto));
     }

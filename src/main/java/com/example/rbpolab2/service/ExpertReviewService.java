@@ -72,7 +72,9 @@ public class ExpertReviewService {
 
         User expert = userRepository.findById(dto.getExpertId())
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
-        if (!"EXPERT".equalsIgnoreCase(expert.getRole())) {
+
+        // В 4-й лабе роли начинаются с ROLE_
+        if (!"ROLE_EXPERT".equalsIgnoreCase(expert.getRole()) && !"EXPERT".equalsIgnoreCase(expert.getRole())) {
             throw new IllegalStateException("Пользователь не является экспертом");
         }
 
